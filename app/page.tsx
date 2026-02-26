@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { callAIAgent } from '@/lib/aiAgent'
-import { FiGrid, FiTrendingUp, FiLayers, FiAward, FiPlus, FiTrash2, FiEdit2, FiSend, FiChevronDown, FiChevronUp, FiCreditCard, FiStar, FiCheck, FiX, FiAlertCircle, FiRefreshCw, FiFilter } from 'react-icons/fi'
+import { FiGrid, FiTrendingUp, FiLayers, FiAward, FiPlus, FiTrash2, FiEdit2, FiSend, FiChevronDown, FiChevronUp, FiCreditCard, FiStar, FiCheck, FiX, FiAlertCircle, FiRefreshCw, FiFilter, FiZap } from 'react-icons/fi'
 import { TbCurrencyRupee } from 'react-icons/tb'
 
 // --- TYPES ---
@@ -1363,6 +1363,243 @@ Total Points: ${totalPoints}`
   )
 }
 
+// --- QUICK SPEND ADVISOR TAB ---
+
+interface QuickAdvice {
+  recommended_card: string
+  reward_rate: string
+  estimated_points: string
+  reasoning: string
+}
+
+function QuickAdvisorTab({ cards }: { cards: CreditCard[] }) {
+  const [amount, setAmount] = useState('')
+  const [merchant, setMerchant] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [advice, setAdvice] = useState<QuickAdvice | null>(null)
+  const [rawSummary, setRawSummary] = useState<string | null>(null)
+  const [history, setHistory] = useState<Array<{ amount: string; merchant: string; card: string; rate: string }>>([])
+
+  const handleAsk = useCallback(async () => {
+    if (!amount.trim() || !merchant.trim() || cards.length === 0) return
+    setLoading(true)
+    setError(null)
+    setAdvice(null)
+    setRawSummary(null)
+
+    const message = `I need to spend \u20B9${amount} on ${merchant}. Which of my credit cards should I use to maximize rewards? Give me a single best card recommendation. All values in Indian Rupees (INR).
+
+My Cards:
+${cards.map(c => `- ${c.name} (${c.issuer}): ${Array.isArray(c.rewardCategories) ? c.rewardCategories.map(r => `${r.category}: ${r.rate}`).join(', ') : 'No categories'}. Annual fee: \u20B9${c.annualFee}`).join('\n')}
+
+Respond with ONE best card recommendation for this specific purchase. Include: which card to use, the applicable reward rate, estimated points/cashback for this specific transaction, and a brief explanation why.`
+
+    try {
+      const res = await callAIAgent(message, AGENT_IDS.optimizer)
+      if (res.success) {
+        const data = parseAgentResponse(res)
+        if (data && typeof data === 'object') {
+          // Try to extract from recommendations array (agent's structured response)
+          if (Array.isArray(data.recommendations) && data.recommendations.length > 0) {
+            const rec = data.recommendations[0]
+            const parsed: QuickAdvice = {
+              recommended_card: rec.recommended_card || 'Unknown',
+              reward_rate: rec.reward_rate || '',
+              estimated_points: rec.estimated_monthly_points || '',
+              reasoning: rec.reasoning || '',
+            }
+            setAdvice(parsed)
+            setHistory(prev => [{ amount, merchant, card: parsed.recommended_card, rate: parsed.reward_rate }, ...prev].slice(0, 10))
+          } else if (data.summary) {
+            // Fallback to summary text
+            setRawSummary(data.summary)
+            setHistory(prev => [{ amount, merchant, card: 'See details', rate: '' }, ...prev].slice(0, 10))
+          } else {
+            setRawSummary(typeof data === 'string' ? data : JSON.stringify(data, null, 2))
+          }
+        } else if (typeof data === 'string') {
+          setRawSummary(data)
+        } else if (res?.response?.message) {
+          setRawSummary(res.response.message)
+        }
+      } else {
+        setError(res?.error ?? 'Failed to get advice. Please try again.')
+      }
+    } catch {
+      setError('An unexpected error occurred.')
+    }
+    setLoading(false)
+  }, [amount, merchant, cards])
+
+  if (cards.length === 0) {
+    return (
+      <div>
+        <h2 className="text-2xl font-serif font-light tracking-wider uppercase mb-2">Quick Spend Advisor</h2>
+        <div className="border border-dashed border-[hsl(30,10%,88%)] p-12 text-center mt-8">
+          <FiZap className="mx-auto mb-4 text-[hsl(30,5%,50%)]" size={32} />
+          <p className="text-sm text-[hsl(30,5%,50%)] leading-relaxed font-sans mb-2">Add your cards in the Dashboard first</p>
+          <p className="text-xs text-[hsl(30,5%,50%)] font-sans">The advisor needs your card portfolio to recommend the best card for a purchase.</p>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      <div className="mb-8">
+        <h2 className="text-2xl font-serif font-light tracking-wider uppercase mb-2">Quick Spend Advisor</h2>
+        <p className="text-sm text-[hsl(30,5%,50%)] leading-relaxed font-sans">Tell us what you want to spend and where -- we will tell you the best card to use.</p>
+      </div>
+
+      {/* Input Section */}
+      <div className="border border-[hsl(30,10%,88%)] bg-white p-8 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+          <div>
+            <label className="block text-xs tracking-wider uppercase text-[hsl(30,5%,50%)] mb-2 font-sans">Amount ({'\u20B9'})</label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[hsl(30,5%,50%)] text-sm">{'\u20B9'}</span>
+              <input
+                type="number"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                placeholder="5000"
+                className="w-full border border-[hsl(30,10%,88%)] pl-8 pr-3 py-3 text-sm outline-none focus:border-[hsl(40,30%,45%)] bg-transparent font-sans"
+                onKeyDown={(e) => e.key === 'Enter' && handleAsk()}
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs tracking-wider uppercase text-[hsl(30,5%,50%)] mb-2 font-sans">Merchant / Category</label>
+            <input
+              type="text"
+              value={merchant}
+              onChange={(e) => setMerchant(e.target.value)}
+              placeholder="Amazon, Swiggy, Flipkart, Petrol Pump..."
+              className="w-full border border-[hsl(30,10%,88%)] px-3 py-3 text-sm outline-none focus:border-[hsl(40,30%,45%)] bg-transparent font-sans"
+              onKeyDown={(e) => e.key === 'Enter' && handleAsk()}
+            />
+          </div>
+        </div>
+
+        {/* Quick Merchant Tags */}
+        <div className="mb-6">
+          <p className="text-xs text-[hsl(30,5%,50%)] font-sans mb-2">Quick select:</p>
+          <div className="flex flex-wrap gap-2">
+            {['Amazon', 'Flipkart', 'Swiggy', 'Zomato', 'BigBasket', 'Petrol Pump', 'Flight Booking', 'Hotel Booking', 'Myntra', 'Croma', 'DMart', 'Restaurant'].map(tag => (
+              <button
+                key={tag}
+                onClick={() => setMerchant(tag)}
+                className={`px-3 py-1.5 text-xs font-sans transition-colors border ${merchant === tag ? 'bg-[hsl(40,30%,45%)] text-white border-[hsl(40,30%,45%)]' : 'bg-[hsl(30,10%,95%)] text-[hsl(30,5%,30%)] border-[hsl(30,10%,88%)] hover:border-[hsl(40,30%,45%)]'}`}
+              >
+                {tag}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <button
+          onClick={handleAsk}
+          disabled={loading || !amount.trim() || !merchant.trim()}
+          className="w-full py-4 text-sm tracking-wider uppercase bg-[hsl(40,30%,45%)] text-white hover:bg-[hsl(40,30%,40%)] disabled:opacity-50 transition-colors font-sans flex items-center justify-center gap-2"
+        >
+          {loading ? (
+            <>
+              <FiRefreshCw className="animate-spin" size={16} />
+              Finding best card...
+            </>
+          ) : (
+            <>
+              <FiZap size={16} />
+              Which card should I use?
+            </>
+          )}
+        </button>
+      </div>
+
+      {/* Error */}
+      {error && (
+        <div className="border border-[hsl(0,50%,45%)] bg-[hsl(0,50%,97%)] p-4 mb-6 flex items-start gap-3">
+          <FiAlertCircle className="text-[hsl(0,50%,45%)] flex-shrink-0 mt-0.5" size={16} />
+          <div>
+            <p className="text-sm text-[hsl(0,50%,45%)] font-sans">{error}</p>
+            <button onClick={handleAsk} className="text-xs text-[hsl(40,30%,45%)] hover:underline mt-1 font-sans">Retry</button>
+          </div>
+        </div>
+      )}
+
+      {/* Loading */}
+      {loading && (
+        <div className="border border-[hsl(30,10%,88%)] bg-white p-8 mb-6 animate-pulse">
+          <div className="h-6 bg-[hsl(30,8%,92%)] w-1/3 mb-4" />
+          <div className="h-4 bg-[hsl(30,8%,92%)] w-2/3 mb-3" />
+          <div className="h-4 bg-[hsl(30,8%,92%)] w-1/2 mb-3" />
+          <div className="h-4 bg-[hsl(30,8%,92%)] w-3/4" />
+        </div>
+      )}
+
+      {/* Result - Structured */}
+      {!loading && advice && (
+        <div className="border border-[hsl(40,30%,45%)] bg-white mb-8">
+          <div className="bg-[hsl(40,40%,97%)] px-8 py-5 border-b border-[hsl(40,30%,80%)]">
+            <p className="text-xs tracking-wider uppercase text-[hsl(40,30%,45%)] font-sans mb-1">Best Card for {'\u20B9'}{parseInt(amount).toLocaleString('en-IN')} at {merchant}</p>
+            <h3 className="text-xl font-serif font-light text-[hsl(40,30%,35%)]">{advice.recommended_card}</h3>
+          </div>
+          <div className="p-8">
+            <div className="grid grid-cols-2 gap-6 mb-6">
+              <div>
+                <p className="text-xs tracking-wider uppercase text-[hsl(30,5%,50%)] font-sans mb-1">Reward Rate</p>
+                <p className="text-lg font-serif font-light text-[hsl(40,30%,45%)]">{advice.reward_rate || '--'}</p>
+              </div>
+              <div>
+                <p className="text-xs tracking-wider uppercase text-[hsl(30,5%,50%)] font-sans mb-1">Estimated Earnings</p>
+                <p className="text-lg font-serif font-light">{advice.estimated_points || '--'}</p>
+              </div>
+            </div>
+            {advice.reasoning && (
+              <div className="border-t border-[hsl(30,10%,88%)] pt-4">
+                <p className="text-xs tracking-wider uppercase text-[hsl(30,5%,50%)] font-sans mb-2">Why This Card</p>
+                <div className="text-sm text-[hsl(30,5%,25%)] leading-relaxed font-sans">{renderMarkdown(advice.reasoning)}</div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Result - Raw text fallback */}
+      {!loading && !advice && rawSummary && (
+        <div className="border border-[hsl(40,30%,45%)] bg-white p-8 mb-8">
+          <p className="text-xs tracking-wider uppercase text-[hsl(40,30%,45%)] font-sans mb-3">Recommendation for {'\u20B9'}{parseInt(amount || '0').toLocaleString('en-IN')} at {merchant}</p>
+          <div className="text-sm text-[hsl(30,5%,25%)] leading-relaxed font-sans">{renderMarkdown(rawSummary)}</div>
+        </div>
+      )}
+
+      {/* Query History */}
+      {history.length > 0 && (
+        <div className="mt-8">
+          <p className="text-xs tracking-wider uppercase text-[hsl(30,5%,50%)] font-sans mb-4">Recent Queries</p>
+          <div className="border border-[hsl(30,10%,88%)] bg-white">
+            <div className="grid grid-cols-4 px-6 py-3 border-b border-[hsl(30,10%,88%)] bg-[hsl(30,10%,95%)]">
+              <span className="text-xs tracking-wider uppercase text-[hsl(30,5%,50%)] font-sans font-medium">Amount</span>
+              <span className="text-xs tracking-wider uppercase text-[hsl(30,5%,50%)] font-sans font-medium">Merchant</span>
+              <span className="text-xs tracking-wider uppercase text-[hsl(30,5%,50%)] font-sans font-medium">Best Card</span>
+              <span className="text-xs tracking-wider uppercase text-[hsl(30,5%,50%)] font-sans font-medium">Rate</span>
+            </div>
+            {history.map((h, i) => (
+              <div key={i} className="grid grid-cols-4 px-6 py-3 border-b border-[hsl(30,10%,88%)] last:border-b-0 items-center">
+                <span className="text-sm font-sans">{'\u20B9'}{parseInt(h.amount).toLocaleString('en-IN')}</span>
+                <span className="text-sm font-sans">{h.merchant}</span>
+                <span className="text-sm font-sans font-medium">{h.card}</span>
+                <span className="text-xs text-[hsl(40,30%,45%)] font-sans">{h.rate}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // --- SIDEBAR ITEM ---
 
 function SidebarItem({ icon, label, active, onClick }: {
@@ -1385,7 +1622,7 @@ function SidebarItem({ icon, label, active, onClick }: {
 // --- MAIN PAGE ---
 
 export default function Page() {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'optimize' | 'alternatives' | 'rewards'>('dashboard')
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'optimize' | 'quick-advice' | 'alternatives' | 'rewards'>('dashboard')
   const [cards, setCards] = useState<CreditCard[]>([])
   const [expenses, setExpenses] = useState<Expense[]>([])
   const [sampleMode, setSampleMode] = useState(false)
@@ -1457,6 +1694,12 @@ export default function Page() {
               onClick={() => setActiveTab('optimize')}
             />
             <SidebarItem
+              icon={<FiZap size={16} />}
+              label="Quick Advice"
+              active={activeTab === 'quick-advice'}
+              onClick={() => setActiveTab('quick-advice')}
+            />
+            <SidebarItem
               icon={<FiLayers size={16} />}
               label="Alternatives"
               active={activeTab === 'alternatives'}
@@ -1514,6 +1757,9 @@ export default function Page() {
             )}
             {activeTab === 'optimize' && (
               <OptimizeTab cards={cards} expenses={expenses} />
+            )}
+            {activeTab === 'quick-advice' && (
+              <QuickAdvisorTab cards={cards} />
             )}
             {activeTab === 'alternatives' && (
               <AlternativesTab cards={cards} expenses={expenses} />
