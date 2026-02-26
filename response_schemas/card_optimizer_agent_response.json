@@ -1,0 +1,36 @@
+{
+  "agent_name": "Card Optimizer Agent",
+  "agent_id": "69a01adb9f922f4da1a06bc1",
+  "description": "Analyzes user's expense categories against their card portfolio's reward structures (points multipliers, cashback rates, bonus categories) and recommends the optimal card for each spending category to maximize total rewards.",
+  "agent_type": "json",
+  "accessor": "result",
+  "auto_generated": true,
+  "response_schema": {
+    "recommendations": [
+      {
+        "category": "string",
+        "recommended_card": "string",
+        "reward_rate": "string",
+        "estimated_monthly_points": "string",
+        "improvement_vs_current": "string",
+        "reasoning": "string"
+      }
+    ],
+    "total_projected_rewards": "string",
+    "summary": "string"
+  },
+  "example_response": {
+    "recommendations": [
+      {
+        "category": "sample string",
+        "recommended_card": "sample string",
+        "reward_rate": "sample string",
+        "estimated_monthly_points": "sample string",
+        "improvement_vs_current": "sample string",
+        "reasoning": "sample string"
+      }
+    ],
+    "total_projected_rewards": "sample string",
+    "summary": "sample string"
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "agent_name": "Card Alternatives Agent",
+  "agent_id": "69a01adb92d75158491bbadf",
+  "description": "Evaluates user's spending patterns and current card portfolio, then searches for alternative credit cards offering better overall value (higher rewards, lower fees, better category bonuses) considering both rewards earned and costs. Uses Perplexity model for web search.",
+  "agent_type": "json",
+  "accessor": "result",
+  "auto_generated": true,
+  "response_schema": {
+    "alternatives": [
+      {
+        "card_name": "string",
+        "issuer": "string",
+        "annual_fee": "string",
+        "key_reward_rates": "string",
+        "estimated_annual_rewards": "string",
+        "net_value_comparison": "string",
+        "why_this_card": "string",
+        "best_for": "string"
+      }
+    ],
+    "current_portfolio_summary": "string",
+    "summary": "string"
+  },
+  "example_response": {
+    "alternatives": [
+      {
+        "card_name": "sample string",
+        "issuer": "sample string",
+        "annual_fee": "sample string",
+        "key_reward_rates": "sample string",
+        "estimated_annual_rewards": "sample string",
+        "net_value_comparison": "sample string",
+        "why_this_card": "sample string",
+        "best_for": "sample string"
+      }
+    ],
+    "current_portfolio_summary": "sample string",
+    "summary": "sample string"
+  }
+}

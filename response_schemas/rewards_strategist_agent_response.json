@@ -1,0 +1,40 @@
+{
+  "agent_name": "Rewards Strategist Agent",
+  "agent_id": "69a01adb92d75158491bbae1",
+  "description": "Tracks point balances across all user cards and provides optimal redemption strategies \u2014 comparing travel bookings, cashback, gift cards, and point transfer valuations to recommend the highest-value redemption path for each rewards currency. Uses Perplexity for current valuations.",
+  "agent_type": "json",
+  "accessor": "result",
+  "auto_generated": true,
+  "response_schema": {
+    "strategies": [
+      {
+        "card_name": "string",
+        "current_balance": "string",
+        "redemption_option": "string",
+        "redemption_type": "string",
+        "estimated_value_per_point": "string",
+        "total_estimated_value": "string",
+        "recommendation_badge": "string",
+        "details": "string"
+      }
+    ],
+    "total_portfolio_value": "string",
+    "summary": "string"
+  },
+  "example_response": {
+    "strategies": [
+      {
+        "card_name": "sample string",
+        "current_balance": "sample string",
+        "redemption_option": "sample string",
+        "redemption_type": "sample string",
+        "estimated_value_per_point": "sample string",
+        "total_estimated_value": "sample string",
+        "recommendation_badge": "sample string",
+        "details": "sample string"
+      }
+    ],
+    "total_portfolio_value": "sample string",
+    "summary": "sample string"
+  }
+}
