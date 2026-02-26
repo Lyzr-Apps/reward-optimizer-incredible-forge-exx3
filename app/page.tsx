@@ -1,8 +1,8 @@
 'use client'
 
 import React, { useState, useEffect, useCallback, useRef } from 'react'
-import { callAIAgent } from '@/lib/aiAgent'
-import { FiGrid, FiTrendingUp, FiLayers, FiAward, FiPlus, FiTrash2, FiEdit2, FiSend, FiChevronDown, FiChevronUp, FiCreditCard, FiStar, FiCheck, FiX, FiAlertCircle, FiRefreshCw, FiFilter, FiZap } from 'react-icons/fi'
+import { callAIAgent, uploadFiles } from '@/lib/aiAgent'
+import { FiGrid, FiTrendingUp, FiLayers, FiAward, FiPlus, FiTrash2, FiEdit2, FiSend, FiChevronDown, FiChevronUp, FiCreditCard, FiStar, FiCheck, FiX, FiAlertCircle, FiRefreshCw, FiFilter, FiZap, FiUploadCloud, FiSearch, FiFile } from 'react-icons/fi'
 import { TbCurrencyRupee } from 'react-icons/tb'
 
 // --- TYPES ---
@@ -356,13 +356,136 @@ function DashboardTab({
   const [expForm, setExpForm] = useState({ category: '', amount: '' })
   const [editingExpId, setEditingExpId] = useState<string | null>(null)
   const [editExpAmount, setEditExpAmount] = useState('')
+  const [fetchingCard, setFetchingCard] = useState(false)
+  const [fetchCardMsg, setFetchCardMsg] = useState<string | null>(null)
+  const [uploadingBill, setUploadingBill] = useState(false)
+  const [uploadMsg, setUploadMsg] = useState<string | null>(null)
+  const [dragOver, setDragOver] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const totalSpend = expenses.reduce((s, e) => s + e.amount, 0)
   const totalPoints = cards.reduce((s, c) => s + c.pointsBalance, 0)
 
   const resetCardForm = () => {
     setCardForm({ name: '', issuer: '', annualFee: '', rewardCategories: [{ category: '', rate: '' }] })
+    setFetchCardMsg(null)
   }
+
+  // --- AUTO-FETCH CARD DETAILS ---
+  const handleFetchCardDetails = useCallback(async () => {
+    const cardName = cardForm.name.trim()
+    if (!cardName) return
+    setFetchingCard(true)
+    setFetchCardMsg('Looking up card details...')
+
+    try {
+      const message = `Look up the reward details for the Indian credit card: "${cardName}". Return the card's issuer, annual fee in INR, and all reward categories with specific rates. This is a card information lookup.`
+      const res = await callAIAgent(message, AGENT_IDS.alternatives)
+      if (res.success) {
+        const data = parseAgentResponse(res)
+        if (data && Array.isArray(data.alternatives) && data.alternatives.length > 0) {
+          const card = data.alternatives[0]
+          // Set issuer
+          if (card.issuer) {
+            setCardForm(prev => ({ ...prev, issuer: card.issuer }))
+          }
+          // Parse annual fee
+          if (card.annual_fee) {
+            const feeMatch = card.annual_fee.replace(/[^0-9.]/g, '')
+            if (feeMatch) {
+              setCardForm(prev => ({ ...prev, annualFee: feeMatch }))
+            }
+          }
+          // Parse reward rates from key_reward_rates string
+          if (card.key_reward_rates) {
+            const ratesStr = card.key_reward_rates as string
+            const pairs = ratesStr.split(/[,;]/).map((s: string) => s.trim()).filter(Boolean)
+            const parsed: RewardCategory[] = []
+            for (const pair of pairs) {
+              const colonIdx = pair.indexOf(':')
+              if (colonIdx > 0) {
+                parsed.push({
+                  category: pair.slice(0, colonIdx).trim(),
+                  rate: pair.slice(colonIdx + 1).trim(),
+                })
+              } else {
+                parsed.push({ category: pair, rate: '' })
+              }
+            }
+            if (parsed.length > 0) {
+              setCardForm(prev => ({ ...prev, rewardCategories: parsed }))
+            }
+          }
+          setFetchCardMsg('Card details fetched successfully')
+        } else {
+          setFetchCardMsg('Could not find detailed info for this card. You can fill in manually.')
+        }
+      } else {
+        setFetchCardMsg('Lookup failed. Please fill in details manually.')
+      }
+    } catch {
+      setFetchCardMsg('Error looking up card. Please fill in details manually.')
+    }
+    setFetchingCard(false)
+  }, [cardForm.name])
+
+  // --- BILL UPLOAD HANDLER ---
+  const handleBillUpload = useCallback(async (files: FileList | File[]) => {
+    const fileArray = Array.from(files)
+    if (fileArray.length === 0) return
+    setUploadingBill(true)
+    setUploadMsg('Uploading bill...')
+
+    try {
+      const uploadRes = await uploadFiles(fileArray)
+      if (uploadRes.success && uploadRes.asset_ids.length > 0) {
+        setUploadMsg('Parsing your statement...')
+        const message = `Parse this credit card bill/statement. Extract all transactions, group them into spending categories (Groceries, Dining, Travel, Shopping, Fuel, Utilities, Entertainment, Healthcare, Insurance, EMI, Online Shopping, Transit, Other), and sum the total amount per category in INR. This is a bill parsing request.`
+        const res = await callAIAgent(message, AGENT_IDS.optimizer, { assets: uploadRes.asset_ids })
+        if (res.success) {
+          const data = parseAgentResponse(res)
+          if (data && Array.isArray(data.recommendations) && data.recommendations.length > 0) {
+            const newExpenses: Expense[] = data.recommendations.map((rec: any) => {
+              const amountStr = (rec.estimated_monthly_points || '').replace(/[^0-9.]/g, '')
+              const amount = parseFloat(amountStr) || 0
+              return {
+                id: generateId(),
+                category: rec.category || 'Other',
+                amount,
+                source: 'statement',
+              }
+            }).filter((e: Expense) => e.amount > 0)
+
+            if (newExpenses.length > 0) {
+              setExpenses(prev => [...prev, ...newExpenses])
+              setUploadMsg(`Extracted ${newExpenses.length} expense categories from your statement`)
+            } else {
+              setUploadMsg('Statement parsed but no expense amounts could be extracted. Try a clearer PDF.')
+            }
+          } else if (data?.summary) {
+            setUploadMsg('Statement read but categories could not be structured. Summary: ' + data.summary.slice(0, 100))
+          } else {
+            setUploadMsg('Could not parse expenses from this file. Try a different format.')
+          }
+        } else {
+          setUploadMsg('Failed to parse statement. Please try again.')
+        }
+      } else {
+        setUploadMsg('File upload failed. Please try again.')
+      }
+    } catch {
+      setUploadMsg('Error processing file. Please try again.')
+    }
+    setUploadingBill(false)
+  }, [setExpenses])
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    setDragOver(false)
+    if (e.dataTransfer.files.length > 0) {
+      handleBillUpload(e.dataTransfer.files)
+    }
+  }, [handleBillUpload])
 
   const handleAddCard = () => {
     if (!cardForm.name.trim()) return
@@ -503,13 +626,32 @@ function DashboardTab({
               <div className="space-y-4">
                 <div>
                   <label className="block text-xs tracking-wider uppercase text-[hsl(30,5%,50%)] mb-1 font-sans">Card Name</label>
-                  <input
-                    type="text"
-                    value={cardForm.name}
-                    onChange={(e) => setCardForm(prev => ({ ...prev, name: e.target.value }))}
-                    placeholder="HDFC Regalia Gold"
-                    className="w-full border border-[hsl(30,10%,88%)] px-3 py-2 text-sm outline-none focus:border-[hsl(40,30%,45%)] bg-transparent font-sans"
-                  />
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={cardForm.name}
+                      onChange={(e) => setCardForm(prev => ({ ...prev, name: e.target.value }))}
+                      placeholder="e.g. HDFC Regalia Gold, SBI SimplyCLICK"
+                      className="flex-1 border border-[hsl(30,10%,88%)] px-3 py-2 text-sm outline-none focus:border-[hsl(40,30%,45%)] bg-transparent font-sans"
+                      onKeyDown={(e) => e.key === 'Enter' && cardForm.name.trim() && handleFetchCardDetails()}
+                    />
+                    <button
+                      onClick={handleFetchCardDetails}
+                      disabled={!cardForm.name.trim() || fetchingCard}
+                      className="flex items-center gap-1.5 px-3 py-2 text-xs tracking-wider uppercase border border-[hsl(40,30%,45%)] text-[hsl(40,30%,45%)] hover:bg-[hsl(40,40%,97%)] disabled:opacity-40 transition-colors font-sans whitespace-nowrap"
+                    >
+                      {fetchingCard ? (
+                        <><FiRefreshCw className="animate-spin" size={13} /> Fetching</>
+                      ) : (
+                        <><FiSearch size={13} /> Auto-Fill</>
+                      )}
+                    </button>
+                  </div>
+                  {fetchCardMsg && (
+                    <p className={`text-xs mt-1.5 font-sans ${fetchCardMsg.includes('successfully') ? 'text-[hsl(140,40%,40%)]' : 'text-[hsl(30,5%,50%)]'}`}>
+                      {fetchCardMsg}
+                    </p>
+                  )}
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -626,13 +768,70 @@ function DashboardTab({
         <div>
           <div className="flex items-center justify-between mb-6">
             <h3 className="text-sm tracking-wider uppercase text-[hsl(30,5%,50%)] font-sans font-medium">My Expenses</h3>
-            <button
-              onClick={() => setShowAddExpense(!showAddExpense)}
-              className="flex items-center gap-2 px-4 py-2 text-xs tracking-wider uppercase bg-[hsl(40,30%,45%)] text-white hover:bg-[hsl(40,30%,40%)] transition-colors font-sans"
-            >
-              <FiPlus size={14} /> Add Expense
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowAddExpense(!showAddExpense)}
+                className="flex items-center gap-2 px-3 py-2 text-xs tracking-wider uppercase bg-[hsl(40,30%,45%)] text-white hover:bg-[hsl(40,30%,40%)] transition-colors font-sans"
+              >
+                <FiPlus size={14} /> Manual
+              </button>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploadingBill}
+                className="flex items-center gap-2 px-3 py-2 text-xs tracking-wider uppercase border border-[hsl(40,30%,45%)] text-[hsl(40,30%,45%)] hover:bg-[hsl(40,40%,97%)] disabled:opacity-40 transition-colors font-sans"
+              >
+                <FiUploadCloud size={14} /> Upload Bill
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf,.csv,.xlsx,.xls,.txt"
+                className="hidden"
+                onChange={(e) => { if (e.target.files) { handleBillUpload(e.target.files); e.target.value = '' } }}
+              />
+            </div>
           </div>
+
+          {/* Bill Upload Drop Zone */}
+          <div
+            onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={handleDrop}
+            className={`border-2 border-dashed p-6 mb-6 text-center transition-colors cursor-pointer ${dragOver ? 'border-[hsl(40,30%,45%)] bg-[hsl(40,40%,97%)]' : 'border-[hsl(30,10%,88%)] bg-white hover:border-[hsl(40,30%,65%)]'}`}
+            onClick={() => fileInputRef.current?.click()}
+          >
+            {uploadingBill ? (
+              <div className="flex flex-col items-center gap-2">
+                <FiRefreshCw className="animate-spin text-[hsl(40,30%,45%)]" size={24} />
+                <p className="text-xs text-[hsl(40,30%,45%)] font-sans">{uploadMsg || 'Processing...'}</p>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center gap-2">
+                <FiUploadCloud className="text-[hsl(30,5%,50%)]" size={24} />
+                <p className="text-xs text-[hsl(30,5%,50%)] font-sans">
+                  Drag and drop your card bill here, or click to browse
+                </p>
+                <p className="text-[10px] text-[hsl(30,5%,65%)] font-sans">
+                  Supports PDF, CSV, Excel, Text files
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Upload Status Message */}
+          {!uploadingBill && uploadMsg && (
+            <div className={`border p-3 mb-6 flex items-start gap-2 ${uploadMsg.includes('Extracted') ? 'border-[hsl(140,40%,70%)] bg-[hsl(140,40%,97%)]' : 'border-[hsl(30,10%,88%)] bg-[hsl(30,10%,95%)]'}`}>
+              {uploadMsg.includes('Extracted') ? (
+                <FiCheck className="text-[hsl(140,40%,40%)] flex-shrink-0 mt-0.5" size={14} />
+              ) : (
+                <FiFile className="text-[hsl(30,5%,50%)] flex-shrink-0 mt-0.5" size={14} />
+              )}
+              <p className="text-xs font-sans text-[hsl(30,5%,35%)]">{uploadMsg}</p>
+              <button onClick={() => setUploadMsg(null)} className="ml-auto text-[hsl(30,5%,50%)] flex-shrink-0">
+                <FiX size={12} />
+              </button>
+            </div>
+          )}
 
           {/* Add Expense Form */}
           {showAddExpense && (
@@ -681,22 +880,26 @@ function DashboardTab({
           )}
 
           {/* Expense Table */}
-          {expenses.length === 0 ? (
+          {expenses.length === 0 && !showAddExpense ? (
             <div className="border border-dashed border-[hsl(30,10%,88%)] p-10 text-center">
               <TbCurrencyRupee className="mx-auto mb-3 text-[hsl(30,5%,50%)]" size={28} />
-              <p className="text-sm text-[hsl(30,5%,50%)] leading-relaxed font-sans">
-                No expenses added. Track your monthly spending to receive optimization insights.
+              <p className="text-sm text-[hsl(30,5%,50%)] leading-relaxed font-sans mb-2">
+                No expenses added yet.
+              </p>
+              <p className="text-xs text-[hsl(30,5%,65%)] font-sans">
+                Upload a card bill above or add expenses manually to start optimizing.
               </p>
             </div>
-          ) : (
+          ) : expenses.length > 0 && (
             <div className="border border-[hsl(30,10%,88%)] bg-white">
-              <div className="grid grid-cols-3 px-6 py-3 border-b border-[hsl(30,10%,88%)] bg-[hsl(30,10%,95%)]">
+              <div className="grid grid-cols-4 px-6 py-3 border-b border-[hsl(30,10%,88%)] bg-[hsl(30,10%,95%)]">
                 <span className="text-xs tracking-wider uppercase text-[hsl(30,5%,50%)] font-sans font-medium">Category</span>
-                <span className="text-xs tracking-wider uppercase text-[hsl(30,5%,50%)] font-sans font-medium">Monthly Amount</span>
+                <span className="text-xs tracking-wider uppercase text-[hsl(30,5%,50%)] font-sans font-medium">Amount</span>
+                <span className="text-xs tracking-wider uppercase text-[hsl(30,5%,50%)] font-sans font-medium">Source</span>
                 <span className="text-xs tracking-wider uppercase text-[hsl(30,5%,50%)] font-sans font-medium text-right">Actions</span>
               </div>
               {expenses.map(exp => (
-                <div key={exp.id} className="grid grid-cols-3 px-6 py-4 border-b border-[hsl(30,10%,88%)] last:border-b-0 items-center group">
+                <div key={exp.id} className="grid grid-cols-4 px-6 py-4 border-b border-[hsl(30,10%,88%)] last:border-b-0 items-center group">
                   <span className="text-sm font-sans">{exp.category}</span>
                   {editingExpId === exp.id ? (
                     <div className="flex items-center gap-2">
@@ -713,6 +916,13 @@ function DashboardTab({
                   ) : (
                     <span className="text-sm font-sans">{'\u20B9'}{exp.amount.toLocaleString('en-IN')}</span>
                   )}
+                  <span className="text-xs text-[hsl(30,5%,50%)] font-sans">
+                    {exp.source === 'statement' ? (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-[hsl(40,40%,95%)] text-[hsl(40,30%,40%)] border border-[hsl(40,30%,80%)]">
+                        <FiFile size={10} /> Statement
+                      </span>
+                    ) : 'Manual'}
+                  </span>
                   <div className="flex gap-2 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
                       onClick={() => { setEditingExpId(exp.id); setEditExpAmount(exp.amount.toString()) }}
@@ -726,9 +936,10 @@ function DashboardTab({
                   </div>
                 </div>
               ))}
-              <div className="grid grid-cols-3 px-6 py-3 bg-[hsl(30,10%,95%)]">
+              <div className="grid grid-cols-4 px-6 py-3 bg-[hsl(30,10%,95%)]">
                 <span className="text-xs tracking-wider uppercase text-[hsl(30,5%,50%)] font-sans font-medium">Total</span>
                 <span className="text-sm font-serif font-normal">{'\u20B9'}{totalSpend.toLocaleString('en-IN')}</span>
+                <span />
                 <span />
               </div>
             </div>
