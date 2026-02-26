@@ -1,7 +1,7 @@
 {
   "agent_name": "Card Optimizer Agent",
   "agent_id": "69a01adb9f922f4da1a06bc1",
-  "description": "Analyzes user's expense categories against their card portfolio's reward structures (points multipliers, cashback rates, bonus categories) and recommends the optimal card for each spending category to maximize total rewards.",
+  "description": "Analyzes user's expense categories against their card portfolio's reward structures globally. Recommends the optimal card for each spending category. Detects spending milestones, transfer limits, and optimization opportunities. Parses card bills/statements.",
   "agent_type": "json",
   "accessor": "result",
   "auto_generated": true,
@@ -16,21 +16,63 @@
         "reasoning": "string"
       }
     ],
+    "milestones": [
+      {
+        "milestone_type": "string",
+        "card_name": "string",
+        "threshold_amount": "string",
+        "current_progress": "string",
+        "remaining_amount": "string",
+        "deadline": "string",
+        "action_required": "string",
+        "estimated_value": "string",
+        "urgency": "string"
+      }
+    ],
+    "transfer_limits": [
+      {
+        "card_name": "string",
+        "limit_type": "string",
+        "limit_amount": "string",
+        "details": "string"
+      }
+    ],
     "total_projected_rewards": "string",
     "summary": "string"
   },
   "example_response": {
     "recommendations": [
       {
-        "category": "sample string",
-        "recommended_card": "sample string",
-        "reward_rate": "sample string",
-        "estimated_monthly_points": "sample string",
-        "improvement_vs_current": "sample string",
-        "reasoning": "sample string"
+        "category": "Dining",
+        "recommended_card": "Amex Gold",
+        "reward_rate": "4x MR points per dollar",
+        "estimated_monthly_points": "3,200 MR points",
+        "improvement_vs_current": "60% more points vs current card",
+        "reasoning": "Amex Gold offers the highest dining rate in your portfolio"
       }
     ],
-    "total_projected_rewards": "sample string",
-    "summary": "sample string"
+    "milestones": [
+      {
+        "milestone_type": "welcome_bonus",
+        "card_name": "Chase Sapphire Preferred",
+        "threshold_amount": "$4,000",
+        "current_progress": "$2,400",
+        "remaining_amount": "$1,600",
+        "deadline": "within first 3 months",
+        "action_required": "Automatic — just meet spend threshold",
+        "estimated_value": "60,000 Ultimate Rewards points (~$750)",
+        "urgency": "high"
+      }
+    ],
+    "transfer_limits": [
+      {
+        "card_name": "Axis Atlas",
+        "limit_type": "per_transfer",
+        "limit_amount": "30,000 points max per partner transfer",
+        "details": "Split large transfers into multiple 30K batches"
+      }
+    ],
+    "total_projected_rewards": "12,500 points/month (~$187)",
+    "summary": "Optimized spending across 3 cards with a high-urgency welcome bonus milestone approaching."
   }
 }

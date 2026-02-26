@@ -1,40 +1,40 @@
 {
-  "app_name": "CardWise - Smart Credit Card Optimizer",
+  "app_name": "CardWise - Global Credit Card Optimizer",
   "agents": {
     "card_optimizer_agent": {
       "agent_id": "69a01adb9f922f4da1a06bc1",
       "name": "Card Optimizer Agent",
-      "description": "Analyzes user's expense categories against their card portfolio's reward structures and recommends the optimal card for each spending category to maximize total rewards.",
+      "description": "Analyzes user's expense categories against their card portfolio's reward structures globally. Recommends the optimal card for each spending category. Detects spending milestones, transfer limits, and optimization opportunities. Parses card bills/statements.",
       "provider": "openai",
       "model": "gpt-4.1",
       "temperature": 0.3,
       "top_p": 1,
       "agent_type": "json",
-      "capabilities": [],
+      "capabilities": ["milestone_detection", "transfer_limit_awareness", "bill_parsing"],
       "response_schema_file": "response_schemas/card_optimizer_agent_response.json"
     },
     "card_alternatives_agent": {
       "agent_id": "69a01adb92d75158491bbadf",
       "name": "Card Alternatives Agent",
-      "description": "Evaluates user's spending patterns and current card portfolio, then searches for alternative credit cards offering better overall value.",
+      "description": "Evaluates user's spending patterns and current card portfolio globally, then searches for alternative credit cards offering better overall value. Performs real-time card information lookups for any card worldwide.",
       "provider": "perplexity",
       "model": "sonar-pro",
       "temperature": 0.3,
       "top_p": 1,
       "agent_type": "json",
-      "capabilities": [],
+      "capabilities": ["global_card_lookup", "transfer_chain_tips", "new_card_detection"],
       "response_schema_file": "response_schemas/card_alternatives_agent_response.json"
     },
     "rewards_strategist_agent": {
       "agent_id": "69a01adb92d75158491bbae1",
       "name": "Rewards Strategist Agent",
-      "description": "Tracks point balances across all user cards and provides optimal redemption strategies to recommend the highest-value redemption path.",
+      "description": "Tracks point balances across all user cards globally and provides optimal redemption strategies — including transfer partner valuations, multi-hop transfer chains, point purchase opportunities, and transfer limit warnings.",
       "provider": "perplexity",
       "model": "sonar-pro",
       "temperature": 0.4,
       "top_p": 1,
       "agent_type": "json",
-      "capabilities": [],
+      "capabilities": ["transfer_chain_optimization", "point_purchase_detection", "transfer_limit_warnings", "milestone_redemption_bonuses"],
       "response_schema_file": "response_schemas/rewards_strategist_agent_response.json"
     }
   },

@@ -2,8 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { callAIAgent, uploadFiles } from '@/lib/aiAgent'
-import { FiGrid, FiTrendingUp, FiLayers, FiAward, FiPlus, FiTrash2, FiEdit2, FiSend, FiChevronDown, FiChevronUp, FiCreditCard, FiStar, FiCheck, FiX, FiAlertCircle, FiRefreshCw, FiFilter, FiZap, FiUploadCloud, FiSearch, FiFile } from 'react-icons/fi'
-import { TbCurrencyRupee } from 'react-icons/tb'
+import { FiGrid, FiTrendingUp, FiLayers, FiAward, FiPlus, FiTrash2, FiEdit2, FiSend, FiChevronDown, FiChevronUp, FiCreditCard, FiStar, FiCheck, FiX, FiAlertCircle, FiRefreshCw, FiFilter, FiZap, FiUploadCloud, FiSearch, FiFile, FiDollarSign, FiTarget, FiShield, FiGift, FiArrowRight, FiInfo } from 'react-icons/fi'
 
 // --- TYPES ---
 
@@ -37,8 +36,44 @@ interface OptRecommendation {
   reasoning?: string
 }
 
+interface Milestone {
+  milestone_type?: string
+  card_name?: string
+  threshold_amount?: string
+  current_progress?: string
+  remaining_amount?: string
+  deadline?: string
+  action_required?: string
+  estimated_value?: string
+  urgency?: string
+}
+
+interface TransferLimit {
+  card_name?: string
+  limit_type?: string
+  limit_amount?: string
+  details?: string
+}
+
+interface PointPurchaseOpp {
+  program?: string
+  current_promotion?: string
+  cost_per_point?: string
+  recommended_use_case?: string
+  is_worth_it?: string
+}
+
+interface TransferLimitSummary {
+  card_name?: string
+  program?: string
+  limit_description?: string
+  workaround?: string
+}
+
 interface OptResult {
   recommendations?: OptRecommendation[]
+  milestones?: Milestone[]
+  transfer_limits?: TransferLimit[]
   total_projected_rewards?: string
   summary?: string
 }
@@ -69,10 +104,14 @@ interface Strategy {
   total_estimated_value?: string
   recommendation_badge?: string
   details?: string
+  transfer_chain_steps?: string
+  warnings?: string
 }
 
 interface RewardsResult {
   strategies?: Strategy[]
+  point_purchase_opportunities?: PointPurchaseOpp[]
+  transfer_limits_summary?: TransferLimitSummary[]
   total_portfolio_value?: string
   summary?: string
 }
@@ -99,48 +138,48 @@ const AGENTS_INFO = [
 const SAMPLE_CARDS: CreditCard[] = [
   {
     id: 'sc1',
-    name: 'HDFC Infinia',
-    issuer: 'HDFC Bank',
-    annualFee: 12500,
+    name: 'Chase Sapphire Preferred',
+    issuer: 'Chase',
+    annualFee: 95,
     rewardCategories: [
       { category: 'Travel', rate: '5x points' },
       { category: 'Dining', rate: '3x points' },
-      { category: 'Entertainment', rate: '3x points' },
+      { category: 'Streaming', rate: '3x points' },
     ],
     pointsBalance: 48500,
   },
   {
     id: 'sc2',
-    name: 'Amex SmartEarn',
+    name: 'Amex Gold',
     issuer: 'American Express',
-    annualFee: 495,
+    annualFee: 250,
     rewardCategories: [
-      { category: 'Groceries', rate: '10x points' },
-      { category: 'Shopping', rate: '5x points' },
-      { category: 'Transit', rate: '3x points' },
+      { category: 'Restaurants', rate: '4x MR points' },
+      { category: 'Groceries', rate: '4x MR points' },
+      { category: 'Flights', rate: '3x MR points' },
     ],
-    pointsBalance: 12300,
+    pointsBalance: 32000,
   },
   {
     id: 'sc3',
-    name: 'SBI SimplyCLICK',
-    issuer: 'SBI Card',
-    annualFee: 499,
+    name: 'Capital One Venture X',
+    issuer: 'Capital One',
+    annualFee: 395,
     rewardCategories: [
-      { category: 'Online Shopping', rate: '10x points' },
-      { category: 'Everything', rate: '1 point per ₹100' },
+      { category: 'Travel', rate: '10x miles' },
+      { category: 'Everything Else', rate: '2x miles' },
     ],
-    pointsBalance: 7800,
+    pointsBalance: 15800,
   },
 ]
 
 const SAMPLE_EXPENSES: Expense[] = [
-  { id: 'se1', category: 'Groceries', amount: 15000, source: 'manual' },
-  { id: 'se2', category: 'Dining', amount: 8000, source: 'manual' },
-  { id: 'se3', category: 'Travel', amount: 12000, source: 'manual' },
-  { id: 'se4', category: 'Gas', amount: 5000, source: 'manual' },
-  { id: 'se5', category: 'Streaming', amount: 1500, source: 'manual' },
-  { id: 'se6', category: 'Shopping', amount: 10000, source: 'manual' },
+  { id: 'se1', category: 'Groceries', amount: 800, source: 'manual' },
+  { id: 'se2', category: 'Dining', amount: 500, source: 'manual' },
+  { id: 'se3', category: 'Travel', amount: 600, source: 'manual' },
+  { id: 'se4', category: 'Gas', amount: 250, source: 'manual' },
+  { id: 'se5', category: 'Streaming', amount: 50, source: 'manual' },
+  { id: 'se6', category: 'Shopping', amount: 400, source: 'manual' },
 ]
 
 const EXPENSE_CATEGORIES = [
@@ -243,6 +282,91 @@ function SkeletonLoader() {
             <div className="h-3 bg-[hsl(30,8%,92%)] w-2/3" />
           </div>
         ))}
+      </div>
+    </div>
+  )
+}
+
+// --- NOTIFICATION PANEL ---
+
+function NotificationPanel({ milestones, label }: { milestones: Milestone[]; label: string }) {
+  const items = Array.isArray(milestones) ? milestones : []
+  if (items.length === 0) return null
+
+  const getUrgencyStyles = (urgency?: string) => {
+    const u = (urgency ?? '').toLowerCase()
+    if (u === 'high' || u === 'urgent' || u === 'critical') {
+      return { border: 'border-l-4 border-l-[hsl(0,50%,45%)]', bg: 'bg-[hsl(0,40%,97%)]', text: 'text-[hsl(0,50%,45%)]' }
+    }
+    if (u === 'medium' || u === 'moderate') {
+      return { border: 'border-l-4 border-l-[hsl(40,70%,50%)]', bg: 'bg-[hsl(40,60%,97%)]', text: 'text-[hsl(40,70%,40%)]' }
+    }
+    return { border: 'border-l-4 border-l-[hsl(40,30%,45%)]', bg: 'bg-[hsl(40,30%,97%)]', text: 'text-[hsl(40,30%,45%)]' }
+  }
+
+  const getUrgencyIcon = (urgency?: string) => {
+    const u = (urgency ?? '').toLowerCase()
+    if (u === 'high' || u === 'urgent' || u === 'critical') return <FiAlertCircle size={16} />
+    if (u === 'medium' || u === 'moderate') return <FiZap size={16} />
+    return <FiStar size={16} />
+  }
+
+  const parseProgress = (current?: string, threshold?: string): number => {
+    if (!current || !threshold) return 0
+    const c = parseFloat(current.replace(/[^0-9.]/g, '')) || 0
+    const t = parseFloat(threshold.replace(/[^0-9.]/g, '')) || 1
+    if (t === 0) return 0
+    return Math.min(100, Math.round((c / t) * 100))
+  }
+
+  return (
+    <div className="mb-8">
+      <div className="flex items-center gap-2 mb-4">
+        <FiTarget size={16} className="text-[hsl(40,30%,45%)]" />
+        <h3 className="text-sm tracking-wider uppercase text-[hsl(30,5%,50%)] font-sans font-medium">{label}</h3>
+      </div>
+      <div className="space-y-3">
+        {items.map((m, i) => {
+          const styles = getUrgencyStyles(m.urgency)
+          const progress = parseProgress(m.current_progress, m.threshold_amount)
+          return (
+            <div key={i} className={`${styles.border} ${styles.bg} border border-[hsl(30,10%,88%)] p-4`}>
+              <div className="flex items-start gap-3">
+                <span className={`${styles.text} flex-shrink-0 mt-0.5`}>{getUrgencyIcon(m.urgency)}</span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap mb-1">
+                    <span className="font-serif text-sm font-normal">{m?.card_name ?? 'Card'}</span>
+                    {m?.milestone_type && (
+                      <span className="px-2 py-0.5 text-[10px] tracking-wider uppercase bg-white border border-[hsl(30,10%,88%)] font-sans">{m.milestone_type}</span>
+                    )}
+                    {m?.urgency && (
+                      <span className={`px-2 py-0.5 text-[10px] tracking-wider uppercase font-sans ${styles.text}`}>{m.urgency}</span>
+                    )}
+                  </div>
+                  {(m?.current_progress || m?.threshold_amount) && (
+                    <div className="mb-2">
+                      <div className="flex justify-between text-[10px] font-sans text-[hsl(30,5%,50%)] mb-1">
+                        <span>Progress: {m?.current_progress ?? '0'}</span>
+                        <span>Target: {m?.threshold_amount ?? '--'}</span>
+                      </div>
+                      <div className="w-full h-1.5 bg-[hsl(30,10%,88%)]">
+                        <div className="h-full bg-[hsl(40,30%,45%)] transition-all duration-500" style={{ width: `${progress}%` }} />
+                      </div>
+                    </div>
+                  )}
+                  {m?.action_required && (
+                    <p className="text-xs font-sans text-[hsl(30,5%,30%)] mb-1">{m.action_required}</p>
+                  )}
+                  <div className="flex flex-wrap gap-4 text-[10px] font-sans text-[hsl(30,5%,50%)]">
+                    {m?.estimated_value && <span>Est. Value: <strong className="text-[hsl(40,30%,45%)]">{m.estimated_value}</strong></span>}
+                    {m?.remaining_amount && <span>Remaining: {m.remaining_amount}</span>}
+                    {m?.deadline && <span>Deadline: {m.deadline}</span>}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )
+        })}
       </div>
     </div>
   )
@@ -379,7 +503,7 @@ function DashboardTab({
     setFetchCardMsg('Looking up card details...')
 
     try {
-      const message = `Look up the reward details for the Indian credit card: "${cardName}". Return the card's issuer, annual fee in INR, and all reward categories with specific rates. This is a card information lookup.`
+      const message = `Look up the reward details for the credit card: "${cardName}". Return the card's issuer, annual fee, and all reward categories with specific rates. This is a card information lookup.`
       const res = await callAIAgent(message, AGENT_IDS.alternatives)
       if (res.success) {
         const data = parseAgentResponse(res)
@@ -440,7 +564,7 @@ function DashboardTab({
       const uploadRes = await uploadFiles(fileArray)
       if (uploadRes.success && uploadRes.asset_ids.length > 0) {
         setUploadMsg('Parsing your statement...')
-        const message = `Parse this credit card bill/statement. Extract all transactions, group them into spending categories (Groceries, Dining, Travel, Shopping, Fuel, Utilities, Entertainment, Healthcare, Insurance, EMI, Online Shopping, Transit, Other), and sum the total amount per category in INR. This is a bill parsing request.`
+        const message = `Parse this credit card bill/statement. Extract all transactions, group them into spending categories (Groceries, Dining, Travel, Shopping, Fuel, Utilities, Entertainment, Healthcare, Insurance, EMI, Online Shopping, Transit, Other), and sum the total amount per category. This is a bill parsing request.`
         const res = await callAIAgent(message, AGENT_IDS.optimizer, { assets: uploadRes.asset_ids })
         if (res.success) {
           const data = parseAgentResponse(res)
@@ -590,10 +714,10 @@ function DashboardTab({
         </div>
         <div className="border border-[hsl(30,10%,88%)] bg-white p-6">
           <div className="flex items-center gap-3 mb-2">
-            <TbCurrencyRupee className="text-[hsl(40,30%,45%)]" size={18} />
+            <FiDollarSign className="text-[hsl(40,30%,45%)]" size={18} />
             <span className="text-xs tracking-wider uppercase text-[hsl(30,5%,50%)] font-sans">Monthly Spend</span>
           </div>
-          <p className="text-2xl font-serif font-light">{'\u20B9'}{totalSpend.toLocaleString('en-IN')}</p>
+          <p className="text-2xl font-serif font-light">{totalSpend.toLocaleString()}</p>
         </div>
         <div className="border border-[hsl(30,10%,88%)] bg-white p-6">
           <div className="flex items-center gap-3 mb-2">
@@ -631,7 +755,7 @@ function DashboardTab({
                       type="text"
                       value={cardForm.name}
                       onChange={(e) => setCardForm(prev => ({ ...prev, name: e.target.value }))}
-                      placeholder="e.g. HDFC Regalia Gold, SBI SimplyCLICK"
+                      placeholder="e.g. Chase Sapphire, Amex Gold"
                       className="flex-1 border border-[hsl(30,10%,88%)] px-3 py-2 text-sm outline-none focus:border-[hsl(40,30%,45%)] bg-transparent font-sans"
                       onKeyDown={(e) => e.key === 'Enter' && cardForm.name.trim() && handleFetchCardDetails()}
                     />
@@ -660,12 +784,12 @@ function DashboardTab({
                       type="text"
                       value={cardForm.issuer}
                       onChange={(e) => setCardForm(prev => ({ ...prev, issuer: e.target.value }))}
-                      placeholder="HDFC Bank"
+                      placeholder="Chase, Amex, etc."
                       className="w-full border border-[hsl(30,10%,88%)] px-3 py-2 text-sm outline-none focus:border-[hsl(40,30%,45%)] bg-transparent font-sans"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs tracking-wider uppercase text-[hsl(30,5%,50%)] mb-1 font-sans">Annual Fee ({'\u20B9'})</label>
+                    <label className="block text-xs tracking-wider uppercase text-[hsl(30,5%,50%)] mb-1 font-sans">Annual Fee</label>
                     <input
                       type="number"
                       value={cardForm.annualFee}
@@ -756,7 +880,7 @@ function DashboardTab({
                     ))}
                   </div>
                   <p className="text-xs text-[hsl(30,5%,50%)] font-sans">
-                    Annual fee: {'\u20B9'}{card.annualFee.toLocaleString('en-IN')}
+                    Annual fee: {card.annualFee.toLocaleString()}
                   </p>
                 </div>
               ))}
@@ -852,7 +976,7 @@ function DashboardTab({
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs tracking-wider uppercase text-[hsl(30,5%,50%)] mb-1 font-sans">Monthly Amount ({'\u20B9'})</label>
+                  <label className="block text-xs tracking-wider uppercase text-[hsl(30,5%,50%)] mb-1 font-sans">Monthly Amount</label>
                   <input
                     type="number"
                     value={expForm.amount}
@@ -882,7 +1006,7 @@ function DashboardTab({
           {/* Expense Table */}
           {expenses.length === 0 && !showAddExpense ? (
             <div className="border border-dashed border-[hsl(30,10%,88%)] p-10 text-center">
-              <TbCurrencyRupee className="mx-auto mb-3 text-[hsl(30,5%,50%)]" size={28} />
+              <FiDollarSign className="mx-auto mb-3 text-[hsl(30,5%,50%)]" size={28} />
               <p className="text-sm text-[hsl(30,5%,50%)] leading-relaxed font-sans mb-2">
                 No expenses added yet.
               </p>
@@ -914,7 +1038,7 @@ function DashboardTab({
                       <button onClick={() => setEditingExpId(null)} className="text-[hsl(30,5%,50%)]"><FiX size={14} /></button>
                     </div>
                   ) : (
-                    <span className="text-sm font-sans">{'\u20B9'}{exp.amount.toLocaleString('en-IN')}</span>
+                    <span className="text-sm font-sans">{exp.amount.toLocaleString()}</span>
                   )}
                   <span className="text-xs text-[hsl(30,5%,50%)] font-sans">
                     {exp.source === 'statement' ? (
@@ -938,7 +1062,7 @@ function DashboardTab({
               ))}
               <div className="grid grid-cols-4 px-6 py-3 bg-[hsl(30,10%,95%)]">
                 <span className="text-xs tracking-wider uppercase text-[hsl(30,5%,50%)] font-sans font-medium">Total</span>
-                <span className="text-sm font-serif font-normal">{'\u20B9'}{totalSpend.toLocaleString('en-IN')}</span>
+                <span className="text-sm font-serif font-normal">{totalSpend.toLocaleString()}</span>
                 <span />
                 <span />
               </div>
@@ -968,15 +1092,15 @@ function OptimizeTab({ cards, expenses }: { cards: CreditCard[]; expenses: Expen
     setError(null)
     setActiveAgentId(AGENT_IDS.optimizer)
 
-    const message = `Analyze my credit card portfolio and recommend the best card for each expense category. All values are in Indian Rupees (INR).
+    const message = `Analyze my credit card portfolio and recommend the best card for each expense category. Also check for any spending milestones I should be aware of and any transfer limits.
 
 My Cards:
-${cards.map(c => `- ${c.name} (${c.issuer}): ${Array.isArray(c.rewardCategories) ? c.rewardCategories.map(r => `${r.category}: ${r.rate}`).join(', ') : 'No categories'}. Annual fee: \u20B9${c.annualFee}`).join('\n')}
+${cards.map(c => `- ${c.name} (${c.issuer}): ${Array.isArray(c.rewardCategories) ? c.rewardCategories.map(r => `${r.category}: ${r.rate}`).join(', ') : 'No categories'}. Annual fee: ${c.annualFee}`).join('\n')}
 
 My Monthly Expenses:
-${expenses.map(e => `- ${e.category}: \u20B9${e.amount}`).join('\n')}
+${expenses.map(e => `- ${e.category}: ${e.amount}`).join('\n')}
 
-Total Monthly Spend: \u20B9${totalSpend}`
+Total Monthly Spend: ${totalSpend}`
 
     try {
       const res = await callAIAgent(message, AGENT_IDS.optimizer)
@@ -1021,12 +1145,12 @@ Total Monthly Spend: \u20B9${totalSpend}`
         <div className="flex items-center justify-between">
           <div>
             <p className="text-xs tracking-wider uppercase text-[hsl(30,5%,50%)] font-sans mb-1">Total Monthly Spend</p>
-            <p className="text-xl font-serif font-light">{'\u20B9'}{totalSpend.toLocaleString('en-IN')}</p>
+            <p className="text-xl font-serif font-light">{totalSpend.toLocaleString()}</p>
           </div>
           <div className="flex flex-wrap gap-2">
             {expenses.slice(0, 5).map(e => (
               <span key={e.id} className="px-2 py-1 text-xs bg-[hsl(30,10%,95%)] text-[hsl(30,5%,30%)] font-sans">
-                {e.category}: {'\u20B9'}{e.amount.toLocaleString('en-IN')}
+                {e.category}: {e.amount.toLocaleString()}
               </span>
             ))}
             {expenses.length > 5 && (
@@ -1072,6 +1196,11 @@ Total Monthly Spend: \u20B9${totalSpend}`
       {/* Results */}
       {!loading && result && (
         <div>
+          {/* Milestones Notification Panel */}
+          {Array.isArray(result?.milestones) && result.milestones.length > 0 && (
+            <NotificationPanel milestones={result.milestones} label="Spending Milestones & Alerts" />
+          )}
+
           {/* Total projected rewards */}
           {result?.total_projected_rewards && (
             <div className="border border-[hsl(40,30%,45%)] bg-[hsl(40,40%,97%)] p-6 mb-6">
@@ -1123,6 +1252,37 @@ Total Monthly Spend: \u20B9${totalSpend}`
             </div>
           )}
 
+          {/* Transfer Limits Section */}
+          {Array.isArray(result?.transfer_limits) && result.transfer_limits.length > 0 && (
+            <div className="mb-6">
+              <div className="flex items-center gap-2 mb-4">
+                <FiShield size={16} className="text-[hsl(40,30%,45%)]" />
+                <h3 className="text-sm tracking-wider uppercase text-[hsl(30,5%,50%)] font-sans font-medium">Transfer Limits</h3>
+              </div>
+              <div className="space-y-3">
+                {result.transfer_limits.map((tl, i) => (
+                  <div key={i} className="border border-[hsl(30,10%,88%)] bg-white p-4 flex items-start gap-3">
+                    <FiInfo size={14} className="text-[hsl(40,30%,45%)] flex-shrink-0 mt-0.5" />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-serif text-sm">{tl?.card_name ?? 'Card'}</span>
+                        {tl?.limit_type && (
+                          <span className="px-2 py-0.5 text-[10px] tracking-wider uppercase bg-[hsl(30,10%,95%)] border border-[hsl(30,10%,88%)] font-sans">{tl.limit_type}</span>
+                        )}
+                      </div>
+                      {tl?.limit_amount && (
+                        <p className="text-xs font-sans text-[hsl(30,5%,30%)] mb-1">Limit: <strong>{tl.limit_amount}</strong></p>
+                      )}
+                      {tl?.details && (
+                        <p className="text-xs font-sans text-[hsl(30,5%,50%)]">{tl.details}</p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Summary */}
           {result?.summary && (
             <div className="border border-[hsl(30,10%,88%)] bg-white p-6 mb-6">
@@ -1156,16 +1316,16 @@ function AlternativesTab({ cards, expenses }: { cards: CreditCard[]; expenses: E
     setLoading(true)
     setError(null)
 
-    const message = `Based on my spending patterns and current card portfolio, find better credit card alternatives available in India. All values are in Indian Rupees (INR).
+    const message = `Based on my spending patterns and current card portfolio, find better credit card alternatives.
 
 My Current Cards:
-${cards.map(c => `- ${c.name} (${c.issuer}): ${Array.isArray(c.rewardCategories) ? c.rewardCategories.map(r => `${r.category}: ${r.rate}`).join(', ') : 'No categories'}. Annual fee: \u20B9${c.annualFee}`).join('\n')}
+${cards.map(c => `- ${c.name} (${c.issuer}): ${Array.isArray(c.rewardCategories) ? c.rewardCategories.map(r => `${r.category}: ${r.rate}`).join(', ') : 'No categories'}. Annual fee: ${c.annualFee}`).join('\n')}
 
 My Monthly Spending by Category:
-${expenses.map(e => `- ${e.category}: \u20B9${e.amount}/month (\u20B9${e.amount * 12}/year)`).join('\n')}
+${expenses.map(e => `- ${e.category}: ${e.amount}/month (${e.amount * 12}/year)`).join('\n')}
 
-Total Annual Spend: \u20B9${totalSpend * 12}
-Total Annual Card Fees: \u20B9${totalFees}`
+Total Annual Spend: ${totalSpend * 12}
+Total Annual Card Fees: ${totalFees}`
 
     try {
       const res = await callAIAgent(message, AGENT_IDS.alternatives)
@@ -1208,11 +1368,11 @@ Total Annual Card Fees: \u20B9${totalFees}`
       <div className="grid grid-cols-2 gap-4 mb-6">
         <div className="border border-[hsl(30,10%,88%)] bg-white p-6">
           <p className="text-xs tracking-wider uppercase text-[hsl(30,5%,50%)] font-sans mb-1">Total Annual Fees</p>
-          <p className="text-xl font-serif font-light">{'\u20B9'}{totalFees.toLocaleString('en-IN')}</p>
+          <p className="text-xl font-serif font-light">{totalFees.toLocaleString()}</p>
         </div>
         <div className="border border-[hsl(30,10%,88%)] bg-white p-6">
           <p className="text-xs tracking-wider uppercase text-[hsl(30,5%,50%)] font-sans mb-1">Annual Spend</p>
-          <p className="text-xl font-serif font-light">{'\u20B9'}{(totalSpend * 12).toLocaleString('en-IN')}</p>
+          <p className="text-xl font-serif font-light">{(totalSpend * 12).toLocaleString()}</p>
         </div>
       </div>
 
@@ -1353,7 +1513,7 @@ function RewardsTab({ cards, setCards }: { cards: CreditCard[]; setCards: React.
     setLoading(true)
     setError(null)
 
-    const message = `Analyze my rewards balances and recommend optimal redemption strategies. All monetary values should be in Indian Rupees (INR). These are Indian credit cards.
+    const message = `Analyze my rewards balances and recommend optimal redemption strategies. Include transfer chain steps where applicable, any warnings, point purchase opportunities, and transfer limits.
 
 My Cards and Points:
 ${cards.map(c => `- ${c.name} (${c.issuer}): ${c.pointsBalance || 0} points`).join('\n')}
@@ -1389,7 +1549,7 @@ Total Points: ${totalPoints}`
   }
 
   const strategies = Array.isArray(result?.strategies) ? result.strategies : []
-  const FILTER_TYPES = ['All', 'Travel', 'Cashback', 'Gift Cards', 'Transfers']
+  const FILTER_TYPES = ['All', 'Travel', 'Cashback', 'Gift Cards', 'Transfers', 'Chain Optimization', 'Point Purchase']
 
   const filteredStrategies = filterType === 'All'
     ? strategies
@@ -1532,6 +1692,26 @@ Total Points: ${totalPoints}`
                       <p className="text-sm font-serif font-normal">{strat?.total_estimated_value ?? '--'}</p>
                     </div>
                   </div>
+                  {/* Transfer Chain Steps */}
+                  {strat?.transfer_chain_steps && (
+                    <div className="mb-3 border border-[hsl(40,30%,80%)] bg-[hsl(40,40%,97%)] p-3">
+                      <div className="flex items-center gap-2 mb-2">
+                        <FiArrowRight size={12} className="text-[hsl(40,30%,45%)]" />
+                        <span className="text-[10px] tracking-wider uppercase text-[hsl(40,30%,45%)] font-sans font-medium">Transfer Chain</span>
+                      </div>
+                      <div className="text-xs font-sans text-[hsl(30,5%,30%)] leading-relaxed">{renderMarkdown(strat.transfer_chain_steps)}</div>
+                    </div>
+                  )}
+                  {/* Warnings */}
+                  {strat?.warnings && (
+                    <div className="mb-3 border-l-4 border-l-[hsl(0,50%,45%)] bg-[hsl(0,40%,97%)] border border-[hsl(0,30%,88%)] p-3">
+                      <div className="flex items-center gap-2 mb-1">
+                        <FiAlertCircle size={12} className="text-[hsl(0,50%,45%)]" />
+                        <span className="text-[10px] tracking-wider uppercase text-[hsl(0,50%,45%)] font-sans font-medium">Warning</span>
+                      </div>
+                      <p className="text-xs font-sans text-[hsl(0,40%,35%)] leading-relaxed">{strat.warnings}</p>
+                    </div>
+                  )}
                   {strat?.details && (
                     <div>
                       <button
@@ -1555,7 +1735,82 @@ Total Points: ${totalPoints}`
 
           {filteredStrategies.length === 0 && strategies.length > 0 && (
             <div className="border border-dashed border-[hsl(30,10%,88%)] p-8 text-center mb-6">
-              <p className="text-sm text-[hsl(30,5%,50%)] font-sans">No strategies match the "{filterType}" filter.</p>
+              <p className="text-sm text-[hsl(30,5%,50%)] font-sans">No strategies match the &quot;{filterType}&quot; filter.</p>
+            </div>
+          )}
+
+          {/* Point Purchase Opportunities */}
+          {Array.isArray(result?.point_purchase_opportunities) && result.point_purchase_opportunities.length > 0 && (
+            <div className="mb-6">
+              <div className="flex items-center gap-2 mb-4">
+                <FiGift size={16} className="text-[hsl(40,30%,45%)]" />
+                <h3 className="text-sm tracking-wider uppercase text-[hsl(30,5%,50%)] font-sans font-medium">Point Purchase Opportunities</h3>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {result.point_purchase_opportunities.map((opp, i) => (
+                  <div key={i} className="border border-[hsl(30,10%,88%)] bg-white p-5">
+                    <div className="flex items-start justify-between mb-2">
+                      <h4 className="font-serif text-sm font-normal">{opp?.program ?? 'Program'}</h4>
+                      {opp?.is_worth_it && (
+                        <span className={`px-2 py-0.5 text-[10px] tracking-wider uppercase font-sans border ${(opp.is_worth_it ?? '').toLowerCase().includes('yes') || (opp.is_worth_it ?? '').toLowerCase().includes('worth') ? 'bg-[hsl(140,40%,95%)] text-[hsl(140,40%,35%)] border-[hsl(140,40%,70%)]' : 'bg-[hsl(0,40%,97%)] text-[hsl(0,50%,45%)] border-[hsl(0,30%,80%)]'}`}>
+                          {opp.is_worth_it}
+                        </span>
+                      )}
+                    </div>
+                    {opp?.current_promotion && (
+                      <p className="text-xs font-sans text-[hsl(30,5%,30%)] mb-1.5">{opp.current_promotion}</p>
+                    )}
+                    <div className="space-y-1">
+                      {opp?.cost_per_point && (
+                        <div className="flex justify-between text-xs font-sans">
+                          <span className="text-[hsl(30,5%,50%)]">Cost/Point</span>
+                          <span>{opp.cost_per_point}</span>
+                        </div>
+                      )}
+                      {opp?.recommended_use_case && (
+                        <div className="flex justify-between text-xs font-sans">
+                          <span className="text-[hsl(30,5%,50%)]">Best Use</span>
+                          <span className="text-right max-w-[60%]">{opp.recommended_use_case}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Transfer Limits Summary */}
+          {Array.isArray(result?.transfer_limits_summary) && result.transfer_limits_summary.length > 0 && (
+            <div className="mb-6">
+              <div className="flex items-center gap-2 mb-4">
+                <FiShield size={16} className="text-[hsl(40,30%,45%)]" />
+                <h3 className="text-sm tracking-wider uppercase text-[hsl(30,5%,50%)] font-sans font-medium">Transfer Limits</h3>
+              </div>
+              <div className="space-y-3">
+                {result.transfer_limits_summary.map((tl, i) => (
+                  <div key={i} className="border border-[hsl(30,10%,88%)] bg-white p-4 flex items-start gap-3">
+                    <FiInfo size={14} className="text-[hsl(40,30%,45%)] flex-shrink-0 mt-0.5" />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <span className="font-serif text-sm">{tl?.card_name ?? 'Card'}</span>
+                        {tl?.program && (
+                          <span className="px-2 py-0.5 text-[10px] tracking-wider uppercase bg-[hsl(30,10%,95%)] border border-[hsl(30,10%,88%)] font-sans">{tl.program}</span>
+                        )}
+                      </div>
+                      {tl?.limit_description && (
+                        <p className="text-xs font-sans text-[hsl(30,5%,30%)] mb-1">{tl.limit_description}</p>
+                      )}
+                      {tl?.workaround && (
+                        <div className="flex items-start gap-1.5 mt-1">
+                          <FiZap size={10} className="text-[hsl(40,30%,45%)] flex-shrink-0 mt-0.5" />
+                          <p className="text-[10px] font-sans text-[hsl(40,30%,45%)]">Workaround: {tl.workaround}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
@@ -1599,10 +1854,10 @@ function QuickAdvisorTab({ cards }: { cards: CreditCard[] }) {
     setAdvice(null)
     setRawSummary(null)
 
-    const message = `I need to spend \u20B9${amount} on ${merchant}. Which of my credit cards should I use to maximize rewards? Give me a single best card recommendation. All values in Indian Rupees (INR).
+    const message = `I need to spend ${amount} on ${merchant}. Which of my credit cards should I use to maximize rewards? Give me a single best card recommendation.
 
 My Cards:
-${cards.map(c => `- ${c.name} (${c.issuer}): ${Array.isArray(c.rewardCategories) ? c.rewardCategories.map(r => `${r.category}: ${r.rate}`).join(', ') : 'No categories'}. Annual fee: \u20B9${c.annualFee}`).join('\n')}
+${cards.map(c => `- ${c.name} (${c.issuer}): ${Array.isArray(c.rewardCategories) ? c.rewardCategories.map(r => `${r.category}: ${r.rate}`).join(', ') : 'No categories'}. Annual fee: ${c.annualFee}`).join('\n')}
 
 Respond with ONE best card recommendation for this specific purchase. Include: which card to use, the applicable reward rate, estimated points/cashback for this specific transaction, and a brief explanation why.`
 
@@ -1667,9 +1922,9 @@ Respond with ONE best card recommendation for this specific purchase. Include: w
       <div className="border border-[hsl(30,10%,88%)] bg-white p-8 mb-8">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
           <div>
-            <label className="block text-xs tracking-wider uppercase text-[hsl(30,5%,50%)] mb-2 font-sans">Amount ({'\u20B9'})</label>
+            <label className="block text-xs tracking-wider uppercase text-[hsl(30,5%,50%)] mb-2 font-sans">Amount</label>
             <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[hsl(30,5%,50%)] text-sm">{'\u20B9'}</span>
+              <FiDollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-[hsl(30,5%,50%)]" size={14} />
               <input
                 type="number"
                 value={amount}
@@ -1686,7 +1941,7 @@ Respond with ONE best card recommendation for this specific purchase. Include: w
               type="text"
               value={merchant}
               onChange={(e) => setMerchant(e.target.value)}
-              placeholder="Amazon, Swiggy, Flipkart, Petrol Pump..."
+              placeholder="Amazon, Uber Eats, Costco, Restaurant..."
               className="w-full border border-[hsl(30,10%,88%)] px-3 py-3 text-sm outline-none focus:border-[hsl(40,30%,45%)] bg-transparent font-sans"
               onKeyDown={(e) => e.key === 'Enter' && handleAsk()}
             />
@@ -1697,7 +1952,7 @@ Respond with ONE best card recommendation for this specific purchase. Include: w
         <div className="mb-6">
           <p className="text-xs text-[hsl(30,5%,50%)] font-sans mb-2">Quick select:</p>
           <div className="flex flex-wrap gap-2">
-            {['Amazon', 'Flipkart', 'Swiggy', 'Zomato', 'BigBasket', 'Petrol Pump', 'Flight Booking', 'Hotel Booking', 'Myntra', 'Croma', 'DMart', 'Restaurant'].map(tag => (
+            {['Amazon', 'Walmart', 'Uber Eats', 'DoorDash', 'Costco', 'Target', 'Starbucks', 'Flight Booking', 'Hotel Booking', 'Gas Station', 'Grocery Store', 'Restaurant'].map(tag => (
               <button
                 key={tag}
                 onClick={() => setMerchant(tag)}
@@ -1753,7 +2008,7 @@ Respond with ONE best card recommendation for this specific purchase. Include: w
       {!loading && advice && (
         <div className="border border-[hsl(40,30%,45%)] bg-white mb-8">
           <div className="bg-[hsl(40,40%,97%)] px-8 py-5 border-b border-[hsl(40,30%,80%)]">
-            <p className="text-xs tracking-wider uppercase text-[hsl(40,30%,45%)] font-sans mb-1">Best Card for {'\u20B9'}{parseInt(amount).toLocaleString('en-IN')} at {merchant}</p>
+            <p className="text-xs tracking-wider uppercase text-[hsl(40,30%,45%)] font-sans mb-1">Best Card for {parseInt(amount).toLocaleString()} at {merchant}</p>
             <h3 className="text-xl font-serif font-light text-[hsl(40,30%,35%)]">{advice.recommended_card}</h3>
           </div>
           <div className="p-8">
@@ -1780,7 +2035,7 @@ Respond with ONE best card recommendation for this specific purchase. Include: w
       {/* Result - Raw text fallback */}
       {!loading && !advice && rawSummary && (
         <div className="border border-[hsl(40,30%,45%)] bg-white p-8 mb-8">
-          <p className="text-xs tracking-wider uppercase text-[hsl(40,30%,45%)] font-sans mb-3">Recommendation for {'\u20B9'}{parseInt(amount || '0').toLocaleString('en-IN')} at {merchant}</p>
+          <p className="text-xs tracking-wider uppercase text-[hsl(40,30%,45%)] font-sans mb-3">Recommendation for {parseInt(amount || '0').toLocaleString()} at {merchant}</p>
           <div className="text-sm text-[hsl(30,5%,25%)] leading-relaxed font-sans">{renderMarkdown(rawSummary)}</div>
         </div>
       )}
@@ -1798,7 +2053,7 @@ Respond with ONE best card recommendation for this specific purchase. Include: w
             </div>
             {history.map((h, i) => (
               <div key={i} className="grid grid-cols-4 px-6 py-3 border-b border-[hsl(30,10%,88%)] last:border-b-0 items-center">
-                <span className="text-sm font-sans">{'\u20B9'}{parseInt(h.amount).toLocaleString('en-IN')}</span>
+                <span className="text-sm font-sans">{parseInt(h.amount).toLocaleString()}</span>
                 <span className="text-sm font-sans">{h.merchant}</span>
                 <span className="text-sm font-sans font-medium">{h.card}</span>
                 <span className="text-xs text-[hsl(40,30%,45%)] font-sans">{h.rate}</span>
@@ -1887,7 +2142,7 @@ export default function Page() {
           {/* Logo */}
           <div className="px-6 py-8 border-b border-[hsl(30,10%,90%)]">
             <h1 className="text-xl font-serif font-light tracking-wider">CardWise</h1>
-            <p className="text-xs text-[hsl(30,5%,50%)] tracking-wider uppercase mt-1 font-sans">Smart Credit Card Optimizer</p>
+            <p className="text-xs text-[hsl(30,5%,50%)] tracking-wider uppercase mt-1 font-sans">Global Credit Card Optimizer</p>
           </div>
 
           {/* Navigation */}

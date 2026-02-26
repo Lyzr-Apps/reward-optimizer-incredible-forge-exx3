@@ -1,7 +1,7 @@
 {
   "agent_name": "Rewards Strategist Agent",
   "agent_id": "69a01adb92d75158491bbae1",
-  "description": "Tracks point balances across all user cards and provides optimal redemption strategies \u2014 comparing travel bookings, cashback, gift cards, and point transfer valuations to recommend the highest-value redemption path for each rewards currency. Uses Perplexity for current valuations.",
+  "description": "Tracks point balances across all user cards globally and provides optimal redemption strategies — including direct redemption, transfer partner valuations, multi-hop transfer chains, point purchase opportunities, and milestone-aware recommendations.",
   "agent_type": "json",
   "accessor": "result",
   "auto_generated": true,
@@ -15,7 +15,26 @@
         "estimated_value_per_point": "string",
         "total_estimated_value": "string",
         "recommendation_badge": "string",
-        "details": "string"
+        "details": "string",
+        "transfer_chain_steps": "string",
+        "warnings": "string"
+      }
+    ],
+    "point_purchase_opportunities": [
+      {
+        "program": "string",
+        "current_promotion": "string",
+        "cost_per_point": "string",
+        "recommended_use_case": "string",
+        "is_worth_it": "string"
+      }
+    ],
+    "transfer_limits_summary": [
+      {
+        "card_name": "string",
+        "program": "string",
+        "limit_description": "string",
+        "workaround": "string"
       }
     ],
     "total_portfolio_value": "string",
@@ -24,17 +43,36 @@
   "example_response": {
     "strategies": [
       {
-        "card_name": "sample string",
-        "current_balance": "sample string",
-        "redemption_option": "sample string",
-        "redemption_type": "sample string",
-        "estimated_value_per_point": "sample string",
-        "total_estimated_value": "sample string",
-        "recommendation_badge": "sample string",
-        "details": "sample string"
+        "card_name": "Chase Sapphire Reserve",
+        "current_balance": "85,000 UR points",
+        "redemption_option": "Transfer to Hyatt for 2 nights at a Category 5 hotel",
+        "redemption_type": "Transfer",
+        "estimated_value_per_point": "$0.02",
+        "total_estimated_value": "$1,700",
+        "recommendation_badge": "Sweet Spot",
+        "details": "Transfer 40,000 UR to World of Hyatt for 2 nights at a Category 5 property valued at $425/night. This yields 2.1 cents per point, far exceeding the 1.5cpp travel portal rate.",
+        "transfer_chain_steps": "Chase UR -> World of Hyatt (1:1 transfer, instant)",
+        "warnings": "Hyatt award availability can be limited during peak seasons. Book early."
       }
     ],
-    "total_portfolio_value": "sample string",
-    "summary": "sample string"
+    "point_purchase_opportunities": [
+      {
+        "program": "Hilton Honors",
+        "current_promotion": "Buy points at 0.5 cents/point (regular 1 cent/point) — 50% bonus sale",
+        "cost_per_point": "$0.005/point",
+        "recommended_use_case": "Top up if you're within 10,000 points of a free night at a premium property",
+        "is_worth_it": "Yes, if redeeming for 0.6+ cents/point value"
+      }
+    ],
+    "transfer_limits_summary": [
+      {
+        "card_name": "Axis Atlas",
+        "program": "Axis Edge Rewards",
+        "limit_description": "Maximum 30,000 points per partner transfer per transaction",
+        "workaround": "Split into multiple transfer requests of 30,000 points each"
+      }
+    ],
+    "total_portfolio_value": "$2,850 across all cards",
+    "summary": "Your portfolio's highest-value move is transferring Chase UR to Hyatt for 2.1 cpp. Consider the Hilton points sale to top up for a free night."
   }
 }
