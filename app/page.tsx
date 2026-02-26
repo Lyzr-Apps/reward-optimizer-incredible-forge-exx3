@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { callAIAgent } from '@/lib/aiAgent'
-import { FiGrid, FiTrendingUp, FiLayers, FiAward, FiPlus, FiTrash2, FiEdit2, FiSend, FiChevronDown, FiChevronUp, FiCreditCard, FiDollarSign, FiStar, FiCheck, FiX, FiAlertCircle, FiRefreshCw, FiFilter } from 'react-icons/fi'
+import { FiGrid, FiTrendingUp, FiLayers, FiAward, FiPlus, FiTrash2, FiEdit2, FiSend, FiChevronDown, FiChevronUp, FiCreditCard, FiStar, FiCheck, FiX, FiAlertCircle, FiRefreshCw, FiFilter } from 'react-icons/fi'
+import { TbCurrencyRupee } from 'react-icons/tb'
 
 // --- TYPES ---
 
@@ -98,47 +99,48 @@ const AGENTS_INFO = [
 const SAMPLE_CARDS: CreditCard[] = [
   {
     id: 'sc1',
-    name: 'Chase Sapphire Preferred',
-    issuer: 'Chase',
-    annualFee: 95,
+    name: 'HDFC Infinia',
+    issuer: 'HDFC Bank',
+    annualFee: 12500,
     rewardCategories: [
       { category: 'Travel', rate: '5x points' },
       { category: 'Dining', rate: '3x points' },
-      { category: 'Streaming', rate: '3x points' },
+      { category: 'Entertainment', rate: '3x points' },
     ],
     pointsBalance: 48500,
   },
   {
     id: 'sc2',
-    name: 'Amex Blue Cash Preferred',
+    name: 'Amex SmartEarn',
     issuer: 'American Express',
-    annualFee: 95,
+    annualFee: 495,
     rewardCategories: [
-      { category: 'Groceries', rate: '6% cashback' },
-      { category: 'Streaming', rate: '6% cashback' },
-      { category: 'Transit', rate: '3% cashback' },
+      { category: 'Groceries', rate: '10x points' },
+      { category: 'Shopping', rate: '5x points' },
+      { category: 'Transit', rate: '3x points' },
     ],
     pointsBalance: 12300,
   },
   {
     id: 'sc3',
-    name: 'Citi Double Cash',
-    issuer: 'Citi',
-    annualFee: 0,
+    name: 'SBI SimplyCLICK',
+    issuer: 'SBI Card',
+    annualFee: 499,
     rewardCategories: [
-      { category: 'Everything', rate: '2% cashback' },
+      { category: 'Online Shopping', rate: '10x points' },
+      { category: 'Everything', rate: '1 point per ₹100' },
     ],
     pointsBalance: 7800,
   },
 ]
 
 const SAMPLE_EXPENSES: Expense[] = [
-  { id: 'se1', category: 'Groceries', amount: 650, source: 'manual' },
-  { id: 'se2', category: 'Dining', amount: 420, source: 'manual' },
-  { id: 'se3', category: 'Travel', amount: 350, source: 'manual' },
-  { id: 'se4', category: 'Gas', amount: 200, source: 'manual' },
-  { id: 'se5', category: 'Streaming', amount: 85, source: 'manual' },
-  { id: 'se6', category: 'Shopping', amount: 300, source: 'manual' },
+  { id: 'se1', category: 'Groceries', amount: 15000, source: 'manual' },
+  { id: 'se2', category: 'Dining', amount: 8000, source: 'manual' },
+  { id: 'se3', category: 'Travel', amount: 12000, source: 'manual' },
+  { id: 'se4', category: 'Gas', amount: 5000, source: 'manual' },
+  { id: 'se5', category: 'Streaming', amount: 1500, source: 'manual' },
+  { id: 'se6', category: 'Shopping', amount: 10000, source: 'manual' },
 ]
 
 const EXPENSE_CATEGORIES = [
@@ -465,10 +467,10 @@ function DashboardTab({
         </div>
         <div className="border border-[hsl(30,10%,88%)] bg-white p-6">
           <div className="flex items-center gap-3 mb-2">
-            <FiDollarSign className="text-[hsl(40,30%,45%)]" size={18} />
+            <TbCurrencyRupee className="text-[hsl(40,30%,45%)]" size={18} />
             <span className="text-xs tracking-wider uppercase text-[hsl(30,5%,50%)] font-sans">Monthly Spend</span>
           </div>
-          <p className="text-2xl font-serif font-light">${totalSpend.toLocaleString()}</p>
+          <p className="text-2xl font-serif font-light">{'\u20B9'}{totalSpend.toLocaleString('en-IN')}</p>
         </div>
         <div className="border border-[hsl(30,10%,88%)] bg-white p-6">
           <div className="flex items-center gap-3 mb-2">
@@ -505,7 +507,7 @@ function DashboardTab({
                     type="text"
                     value={cardForm.name}
                     onChange={(e) => setCardForm(prev => ({ ...prev, name: e.target.value }))}
-                    placeholder="Chase Sapphire Preferred"
+                    placeholder="HDFC Regalia Gold"
                     className="w-full border border-[hsl(30,10%,88%)] px-3 py-2 text-sm outline-none focus:border-[hsl(40,30%,45%)] bg-transparent font-sans"
                   />
                 </div>
@@ -516,17 +518,17 @@ function DashboardTab({
                       type="text"
                       value={cardForm.issuer}
                       onChange={(e) => setCardForm(prev => ({ ...prev, issuer: e.target.value }))}
-                      placeholder="Chase"
+                      placeholder="HDFC Bank"
                       className="w-full border border-[hsl(30,10%,88%)] px-3 py-2 text-sm outline-none focus:border-[hsl(40,30%,45%)] bg-transparent font-sans"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs tracking-wider uppercase text-[hsl(30,5%,50%)] mb-1 font-sans">Annual Fee ($)</label>
+                    <label className="block text-xs tracking-wider uppercase text-[hsl(30,5%,50%)] mb-1 font-sans">Annual Fee ({'\u20B9'})</label>
                     <input
                       type="number"
                       value={cardForm.annualFee}
                       onChange={(e) => setCardForm(prev => ({ ...prev, annualFee: e.target.value }))}
-                      placeholder="95"
+                      placeholder="2500"
                       className="w-full border border-[hsl(30,10%,88%)] px-3 py-2 text-sm outline-none focus:border-[hsl(40,30%,45%)] bg-transparent font-sans"
                     />
                   </div>
@@ -612,7 +614,7 @@ function DashboardTab({
                     ))}
                   </div>
                   <p className="text-xs text-[hsl(30,5%,50%)] font-sans">
-                    Annual fee: ${card.annualFee}
+                    Annual fee: {'\u20B9'}{card.annualFee.toLocaleString('en-IN')}
                   </p>
                 </div>
               ))}
@@ -651,12 +653,12 @@ function DashboardTab({
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs tracking-wider uppercase text-[hsl(30,5%,50%)] mb-1 font-sans">Monthly Amount ($)</label>
+                  <label className="block text-xs tracking-wider uppercase text-[hsl(30,5%,50%)] mb-1 font-sans">Monthly Amount ({'\u20B9'})</label>
                   <input
                     type="number"
                     value={expForm.amount}
                     onChange={(e) => setExpForm(prev => ({ ...prev, amount: e.target.value }))}
-                    placeholder="500"
+                    placeholder="10000"
                     className="w-full border border-[hsl(30,10%,88%)] px-3 py-2 text-sm outline-none focus:border-[hsl(40,30%,45%)] bg-transparent font-sans"
                   />
                 </div>
@@ -681,7 +683,7 @@ function DashboardTab({
           {/* Expense Table */}
           {expenses.length === 0 ? (
             <div className="border border-dashed border-[hsl(30,10%,88%)] p-10 text-center">
-              <FiDollarSign className="mx-auto mb-3 text-[hsl(30,5%,50%)]" size={28} />
+              <TbCurrencyRupee className="mx-auto mb-3 text-[hsl(30,5%,50%)]" size={28} />
               <p className="text-sm text-[hsl(30,5%,50%)] leading-relaxed font-sans">
                 No expenses added. Track your monthly spending to receive optimization insights.
               </p>
@@ -709,7 +711,7 @@ function DashboardTab({
                       <button onClick={() => setEditingExpId(null)} className="text-[hsl(30,5%,50%)]"><FiX size={14} /></button>
                     </div>
                   ) : (
-                    <span className="text-sm font-sans">${exp.amount.toLocaleString()}</span>
+                    <span className="text-sm font-sans">{'\u20B9'}{exp.amount.toLocaleString('en-IN')}</span>
                   )}
                   <div className="flex gap-2 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
@@ -726,7 +728,7 @@ function DashboardTab({
               ))}
               <div className="grid grid-cols-3 px-6 py-3 bg-[hsl(30,10%,95%)]">
                 <span className="text-xs tracking-wider uppercase text-[hsl(30,5%,50%)] font-sans font-medium">Total</span>
-                <span className="text-sm font-serif font-normal">${totalSpend.toLocaleString()}</span>
+                <span className="text-sm font-serif font-normal">{'\u20B9'}{totalSpend.toLocaleString('en-IN')}</span>
                 <span />
               </div>
             </div>
@@ -755,15 +757,15 @@ function OptimizeTab({ cards, expenses }: { cards: CreditCard[]; expenses: Expen
     setError(null)
     setActiveAgentId(AGENT_IDS.optimizer)
 
-    const message = `Analyze my credit card portfolio and recommend the best card for each expense category.
+    const message = `Analyze my credit card portfolio and recommend the best card for each expense category. All values are in Indian Rupees (INR).
 
 My Cards:
-${cards.map(c => `- ${c.name} (${c.issuer}): ${Array.isArray(c.rewardCategories) ? c.rewardCategories.map(r => `${r.category}: ${r.rate}`).join(', ') : 'No categories'}. Annual fee: $${c.annualFee}`).join('\n')}
+${cards.map(c => `- ${c.name} (${c.issuer}): ${Array.isArray(c.rewardCategories) ? c.rewardCategories.map(r => `${r.category}: ${r.rate}`).join(', ') : 'No categories'}. Annual fee: \u20B9${c.annualFee}`).join('\n')}
 
 My Monthly Expenses:
-${expenses.map(e => `- ${e.category}: $${e.amount}`).join('\n')}
+${expenses.map(e => `- ${e.category}: \u20B9${e.amount}`).join('\n')}
 
-Total Monthly Spend: $${totalSpend}`
+Total Monthly Spend: \u20B9${totalSpend}`
 
     try {
       const res = await callAIAgent(message, AGENT_IDS.optimizer)
@@ -808,12 +810,12 @@ Total Monthly Spend: $${totalSpend}`
         <div className="flex items-center justify-between">
           <div>
             <p className="text-xs tracking-wider uppercase text-[hsl(30,5%,50%)] font-sans mb-1">Total Monthly Spend</p>
-            <p className="text-xl font-serif font-light">${totalSpend.toLocaleString()}</p>
+            <p className="text-xl font-serif font-light">{'\u20B9'}{totalSpend.toLocaleString('en-IN')}</p>
           </div>
           <div className="flex flex-wrap gap-2">
             {expenses.slice(0, 5).map(e => (
               <span key={e.id} className="px-2 py-1 text-xs bg-[hsl(30,10%,95%)] text-[hsl(30,5%,30%)] font-sans">
-                {e.category}: ${e.amount}
+                {e.category}: {'\u20B9'}{e.amount.toLocaleString('en-IN')}
               </span>
             ))}
             {expenses.length > 5 && (
@@ -943,16 +945,16 @@ function AlternativesTab({ cards, expenses }: { cards: CreditCard[]; expenses: E
     setLoading(true)
     setError(null)
 
-    const message = `Based on my spending patterns and current card portfolio, find better credit card alternatives.
+    const message = `Based on my spending patterns and current card portfolio, find better credit card alternatives available in India. All values are in Indian Rupees (INR).
 
 My Current Cards:
-${cards.map(c => `- ${c.name} (${c.issuer}): ${Array.isArray(c.rewardCategories) ? c.rewardCategories.map(r => `${r.category}: ${r.rate}`).join(', ') : 'No categories'}. Annual fee: $${c.annualFee}`).join('\n')}
+${cards.map(c => `- ${c.name} (${c.issuer}): ${Array.isArray(c.rewardCategories) ? c.rewardCategories.map(r => `${r.category}: ${r.rate}`).join(', ') : 'No categories'}. Annual fee: \u20B9${c.annualFee}`).join('\n')}
 
 My Monthly Spending by Category:
-${expenses.map(e => `- ${e.category}: $${e.amount}/month ($${e.amount * 12}/year)`).join('\n')}
+${expenses.map(e => `- ${e.category}: \u20B9${e.amount}/month (\u20B9${e.amount * 12}/year)`).join('\n')}
 
-Total Annual Spend: $${totalSpend * 12}
-Total Annual Card Fees: $${totalFees}`
+Total Annual Spend: \u20B9${totalSpend * 12}
+Total Annual Card Fees: \u20B9${totalFees}`
 
     try {
       const res = await callAIAgent(message, AGENT_IDS.alternatives)
@@ -995,11 +997,11 @@ Total Annual Card Fees: $${totalFees}`
       <div className="grid grid-cols-2 gap-4 mb-6">
         <div className="border border-[hsl(30,10%,88%)] bg-white p-6">
           <p className="text-xs tracking-wider uppercase text-[hsl(30,5%,50%)] font-sans mb-1">Total Annual Fees</p>
-          <p className="text-xl font-serif font-light">${totalFees.toLocaleString()}</p>
+          <p className="text-xl font-serif font-light">{'\u20B9'}{totalFees.toLocaleString('en-IN')}</p>
         </div>
         <div className="border border-[hsl(30,10%,88%)] bg-white p-6">
           <p className="text-xs tracking-wider uppercase text-[hsl(30,5%,50%)] font-sans mb-1">Annual Spend</p>
-          <p className="text-xl font-serif font-light">${(totalSpend * 12).toLocaleString()}</p>
+          <p className="text-xl font-serif font-light">{'\u20B9'}{(totalSpend * 12).toLocaleString('en-IN')}</p>
         </div>
       </div>
 
@@ -1140,7 +1142,7 @@ function RewardsTab({ cards, setCards }: { cards: CreditCard[]; setCards: React.
     setLoading(true)
     setError(null)
 
-    const message = `Analyze my rewards balances and recommend optimal redemption strategies.
+    const message = `Analyze my rewards balances and recommend optimal redemption strategies. All monetary values should be in Indian Rupees (INR). These are Indian credit cards.
 
 My Cards and Points:
 ${cards.map(c => `- ${c.name} (${c.issuer}): ${c.pointsBalance || 0} points`).join('\n')}
